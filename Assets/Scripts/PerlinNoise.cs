@@ -2,34 +2,30 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Events;
 using UnityEngine.Tilemaps;
 
 public class PerlinNoise : MonoBehaviour
 {
-    public enum ConditionTileMap
+    [Serializable]
+    public struct PerlinCondition
     {
-        GRASS,
-        GROUND,
-        WATER,
-        DEEPWATER
+        [SerializeField]
+        public float min;
+        [SerializeField]
+        public float max;
+        public UnityEvent<int, int> dispatch;
     }
 
-    public enum ConditionOperation
-    {
-        LESS,
-        GREATER
-    }
+    [SerializeField]
+    public List<PerlinCondition> perlinConditions = new List<PerlinCondition>();
 
-    public class Condition
-    {
-        public ConditionTileMap TileMap;
-        public ConditionOperation Operation;
-
-    }
-
-
-    [SerializeField] private Condition[] conditions = new Condition[2];
     private float[] grid;
+
+    [SerializeField] private int randomSeed = 0;
+    [SerializeField] private float randomOffsetX = 0f;
+    [SerializeField] private float randomOffsetY = 0f;
+
 
     [SerializeField]private int height = 256;
     [SerializeField]private int width = 256;
@@ -65,6 +61,11 @@ public class PerlinNoise : MonoBehaviour
 
     public void GenerateTexture()
     {
+        UnityEngine.Random.InitState(randomSeed);
+        randomOffsetX = UnityEngine.Random.value * 100;
+        randomOffsetY = UnityEngine.Random.value * 100;
+
+
         Clear();
 
         var texture = new Texture2D(width , height  );
@@ -74,40 +75,43 @@ public class PerlinNoise : MonoBehaviour
             for (int y = 0; y < height; y++)
             {
                 var value = CalculatePerlinNoise(x, y);
-                
-                if (value < .7f)
-                    onlyWaterTileMap.SetTile(new Vector3Int(x, y, 0), simpleWater);
 
-                //if (value <= .2f && value > .1f)
-                //    deepWaterTileMap.SetTile(new Vector3Int(x, y, 0), deepWater);
+                foreach (var condition in perlinConditions)
+                {
 
-                //if (value < .5f && value > .2f)
-                //    waterTileMap.SetTile( new Vector3Int(x, y, 0), water);
-
-                //if(value > .39f)
-                //    groundTileMap.SetTile(new Vector3Int(x, y, 0), terrain);
-
-                if (value < .1f)
-                    deepWaterTileMap.SetTile(new Vector3Int(x, y, 0), water);
-
-                if (value > .5f)
-                    waterTileMap.SetTile(new Vector3Int(x, y, 0), water);
-
-                if (value >= .6f)
-                    grassTileMap.SetTile(new Vector3Int(x, y, 0), grass);
-
-                if (value >= .85f)
-                    groundTileMap.SetTile(new Vector3Int(x, y, 0), terrain);
-
+                    if ( value >= condition.min &&  value <= condition.max)
+                        if (condition.dispatch != null)
+                            condition.dispatch.Invoke(x, y);
+                    
+                }
             }
         }
+    }
 
+    public void AddTileSimpleWater(int x, int y)
+    {
+        onlyWaterTileMap.SetTile(new Vector3Int(x, y, 0), simpleWater);
+    }
+
+    public void AddTileWater(int x, int y)
+    {
+        deepWaterTileMap.SetTile(new Vector3Int(x, y, 0), water);
+    }
+
+    public void AddTileGrass(int x, int y)
+    {
+        grassTileMap.SetTile(new Vector3Int(x, y, 0), grass);
+    }
+
+    public void AddTileTerrain(int x, int y)
+    {
+        groundTileMap.SetTile(new Vector3Int(x, y, 0), terrain);
     }
 
     private float CalculatePerlinNoise(int x, int y)
     {
-        float xCoord = (float)x / width * scale + offset.x;
-        float yCoord = (float)y / height * scale + offset.y;
+        float xCoord = (float)x / width * scale + offset.x + randomOffsetX;
+        float yCoord = (float)y / height * scale + offset.y + randomOffsetY;
         return Mathf.PerlinNoise(xCoord, yCoord);
     }
 
